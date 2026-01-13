@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Categories & Subcategories API Tester</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 1200px; 
+            margin: 20px auto; 
+            padding: 20px; 
+            background-color: #f5f5f5;
+        }
+        .section {
+            background: white;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { color: #2563eb; }
+        h2 { color: #1e40af; margin-top: 0; }
+        button { 
+            padding: 10px 20px; 
+            margin: 5px; 
+            cursor: pointer; 
+            background: #2563eb; 
+            color: white; 
+            border: none; 
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button:hover { background: #1d4ed8; }
+        button.danger { background: #dc2626; }
+        button.danger:hover { background: #b91c1c; }
+        input, textarea, select { 
+            width: 100%; 
+            padding: 8px; 
+            margin: 5px 0; 
+            border: 1px solid #ddd; 
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        textarea { min-height: 80px; resize: vertical; }
+        .result { 
+            margin-top: 10px; 
+            padding: 15px; 
+            background: #f3f4f6; 
+            border-radius: 4px; 
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success { background: #d1fae5; border-left: 4px solid #10b981; }
+        .error { background: #fee2e2; border-left: 4px solid #dc2626; }
+        .info { background: #dbeafe; border-left: 4px solid #2563eb; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        label { font-weight: bold; margin-top: 10px; display: block; }
+        .token-input { font-family: monospace; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>📁 Categories & Subcategories API Tester</h1>
+    
+    <div class="section">
+        <h2>🔐 Configuration</h2>
+        <label>Base URL:</label>
+        <input type="text" id="baseUrl" value="http://localhost:3000/api">
+        <label>Access Token (from login):</label>
+        <input type="text" id="accessToken" class="token-input" placeholder="Paste your JWT access token here">
+        <p class="info">💡 Login first at <code>/api/auth/login</code> to get your access token</p>
+    </div>
+
+    <!-- CATEGORIES SECTION -->
+    <div class="section">
+        <h2>📂 Categories</h2>
+        
+        <div class="grid">
+            <div>
+                <h3>Get All Categories</h3>
+                <label>Include Subcategories:</label>
+                <select id="includeSubs">
+                    <option value="true">Yes (default)</option>
+                    <option value="false">No</option>
+                </select>
+                <button onclick="getAllCategories()">Get All Categories</button>
+                <div id="getAllCategoriesResult" class="result"></div>
+            </div>
+            
+            <div>
+                <h3>Get Category by ID</h3>
+                <input type="text" id="categoryId" placeholder="Category UUID">
+                <button onclick="getCategoryById()">Get Category</button>
+                <div id="getCategoryResult" class="result"></div>
+            </div>
+        </div>
+
+        <h3>Create Category</h3>
+        <input type="text" id="catName" placeholder="Category Name (e.g., SON, VIDEO, LUMIERE)">
+        <textarea id="catDescription" placeholder="Description (optional)"></textarea>
+        <input type="text" id="catIcon" placeholder="Icon URL (optional)">
+        <button onclick="createCategory()">Create Category</button>
+        <div id="createCategoryResult" class="result"></div>
+
+        <h3>Update Category</h3>
+        <input type="text" id="updateCatId" placeholder="Category ID to update">
+        <input type="text" id="updateCatName" placeholder="New Name (optional)">
+        <textarea id="updateCatDescription" placeholder="New Description (optional)"></textarea>
+        <input type="text" id="updateCatIcon" placeholder="New Icon URL (optional)">
+        <button onclick="updateCategory()">Update Category</button>
+        <div id="updateCategoryResult" class="result"></div>
+
+        <h3>Delete Category</h3>
+        <input type="text" id="deleteCatId" placeholder="Category ID to delete">
+        <button class="danger" onclick="deleteCategory()">Delete Category</button>
+        <div id="deleteCategoryResult" class="result"></div>
+    </div>
+
+    <!-- SUBCATEGORIES SECTION -->
+    <div class="section">
+        <h2>📋 Subcategories</h2>
+        
+        <div class="grid">
+            <div>
+                <h3>Get All Subcategories</h3>
+                <input type="text" id="filterCategoryId" placeholder="Filter by Category ID (optional)">
+                <button onclick="getAllSubcategories()">Get All Subcategories</button>
+                <div id="getAllSubcategoriesResult" class="result"></div>
+            </div>
+            
+            <div>
+                <h3>Get Subcategory by ID</h3>
+                <input type="text" id="subcategoryId" placeholder="Subcategory UUID">
+                <button onclick="getSubcategoryById()">Get Subcategory</button>
+                <div id="getSubcategoryResult" class="result"></div>
+            </div>
+        </div>
+
+        <h3>Create Subcategory</h3>
+        <input type="text" id="subCatId" placeholder="Category ID (required)">
+        <input type="text" id="subName" placeholder="Subcategory Name (e.g., Microphones, Speakers)">
+        <textarea id="subDescription" placeholder="Description (optional)"></textarea>
+        <button onclick="createSubcategory()">Create Subcategory</button>
+        <div id="createSubcategoryResult" class="result"></div>
+
+        <h3>Update Subcategory</h3>
+        <input type="text" id="updateSubId" placeholder="Subcategory ID to update">
+        <input type="text" id="updateSubCatId" placeholder="New Category ID (optional)">
+        <input type="text" id="updateSubName" placeholder="New Name (optional)">
+        <textarea id="updateSubDescription" placeholder="New Description (optional)"></textarea>
+        <button onclick="updateSubcategory()">Update Subcategory</button>
+        <div id="updateSubcategoryResult" class="result"></div>
+
+        <h3>Delete Subcategory</h3>
+        <input type="text" id="deleteSubId" placeholder="Subcategory ID to delete">
+        <button class="danger" onclick="deleteSubcategory()">Delete Subcategory</button>
+        <div id="deleteSubcategoryResult" class="result"></div>
+    </div>
+
+    <script>
+        const baseUrl = () => document.getElementById('baseUrl').value;
+        const getToken = () => document.getElementById('accessToken').value;
+
+        function showResult(elementId, data, isError = false) {
+            const result = document.getElementById(elementId);
+            result.textContent = JSON.stringify(data, null, 2);
+            result.className = 'result ' + (isError ? 'error' : 'success');
+        }
+
+        // CATEGORIES
+        async function getAllCategories() {
+            const includeSubs = document.getElementById('includeSubs').value;
+            const result = document.getElementById('getAllCategoriesResult');
+            result.textContent = 'Loading...';
+            
+            try {
+                const response = await fetch(`${baseUrl()}/categories?includeSubcategories=${includeSubs}`, {
+                    headers: { 'Authorization': `Bearer ${getToken()}` }
+                });
+                const data = await response.json();
+                showResult('getAllCategoriesResult', data, !response.ok);
+            } catch (error) {
+                showResult('getAllCategoriesResult', { error: error.message }, true);
+            }
+        }
+
+        async function getCategoryById() {
+            const id = document.getElementById('categoryId').value;
+            if (!id) { alert('Please enter Category ID'); return; }
+            
+            const result = document.getElementById('getCategoryResult');
+            result.textContent = 'Loading...';
+            
+            try {
+                const response = await fetch(`${baseUrl()}/categories/${id}`, {
+                    headers: { 'Authorization': `Bearer ${getToken()}` }
+                });
+                const data = await response.json();
+                showResult('getCategoryResult', data, !response.ok);
+            } catch (error) {
+                showResult('getCategoryResult', { error: error.message }, true);
+            }
+        }
+
+        async function createCategory() {
+            const name = document.getElementById('catName').value;
+            if (!name) { alert('Category name is required'); return; }
+            
+            const result = document.getElementById('createCategoryResult');
+            result.textContent = 'Creating...';
+            
+            try {
+                const response = await fetch(`${baseUrl()}/categories`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${getToken()}`
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        description: document.getElementById('catDescription').value || undefined,
+                        icon: document.getElementById('catIcon').value || undefined
+                    })
+                });
+                const data = await response.json();
+                showResult('createCategoryResult', data, !response.ok);
+                if (response.ok) {
+                    document.getElementById('categoryId').value = data.data?.category?.id || '';
+                }
+            } catch (error) {
+                showResult('createCategoryResult', { error: error.message }, true);
+            }
+        }
+
+        async function updateCategory() {
+            const id = document.getElementById('updateCatId').value;
+            if (!id) { alert('Please enter Category ID'); return; }
+            
+            const result = document.getElementById('updateCategoryResult');
+            result.textContent = 'Updating...';
+            
+            try {
+                const body = {};
+                const name = document.getElementById('updateCatName').value;
+                const desc = document.getElementById('updateCatDescription').value;
+                const icon = document.getElementById('updateCatIcon').value;
+                
+                if (name) body.name = name;
+                if (desc) body.description = desc;
+                if (icon) body.icon = icon;
+                
+                const response = await fetch(`${baseUrl()}/categories/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${getToken()}`
+                    },
+                    body: JSON.stringify(body)
+                });
+                const data = await response.json();
+                showResult('updateCategoryResult', data, !response.ok);
+            } catch (error) {
+                showResult('updateCategoryResult', { error: error.message }, true);
+            }
+        }
+
+        async function deleteCategory() {
+            const id = document.getElementById('deleteCatId').value;
+            if (!id) { alert('Please enter Category ID'); return; }
+            if (!confirm('Are you sure you want to delete this category? This will also delete all subcategories!')) return;
+            
+            const result = document.getElementById('deleteCategoryResult');
+            result.textContent = 'Deleting...';
+            
+            try {
+                const response = await fetch(`${baseUrl()}/categories/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${getToken()}` }
+                });
+                const data = await response.json();
+                showResult('deleteCategoryResult', data, !response.ok);
+            } catch (error) {
+                showResult('deleteCategoryResult', { error: error.message }, true);
+            }
+        }
+
+        // SUBCATEGORIES
+        async function getAllSubcategories() {
+            const categoryId = document.getElementById('filterCategoryId').value;
+            const url = categoryId 
+                ? `${baseUrl()}/subcategories?categoryId=${categoryId}`
+                : `${baseUrl()}/subcategories`;
+            
+            const result = document.getElementById('getAllSubcategoriesResult');
+            result.textContent = 'Loading...';
+            
+            try {
+                const response = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${getToken()}` }
+                });
+                const data = await response.json();
+                showResult('getAllSubcategoriesResult', data, !response.ok);
+            } catch (error) {
+                showResult('getAllSubcategoriesResult', { error: error.message }, true);
+            }
+        }
+
+        async function getSubcategoryById() {
+            const id = document.getElementById('subcategoryId').value;
+            if (!id) { alert('Please enter Subcategory ID'); return; }
+            
+            const result = document.getElementById('getSubcategoryResult');
+            result.textContent = 'Loading...';
+            
+            try {
+                const response = await fetch(`${baseUrl()}/subcategories/${id}`, {
+                    headers: { 'Authorization': `Bearer ${getToken()}` }
+                });
+                const data = await response.json();
+                showResult('getSubcategoryResult', data, !response.ok);
+            } catch (error) {
+                showResult('getSubcategoryResult', { error: error.message }, true);
+            }
+        }
+
+        async function createSubcategory() {
+            const categoryId = document.getElementById('subCatId').value;
+            const name = document.getElementById('subName').value;
+            if (!categoryId || !name) { alert('Category ID and Name are required'); return; }
+            
+            const result = document.getElementById('createSubcategoryResult');
+            result.textContent = 'Creating...';
+            
+            try {
+                const response = await fetch(`${baseUrl()}/subcategories`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${getToken()}`
+                    },
+                    body: JSON.stringify({
+                        category_id: categoryId,
+                        name: name,
+                        description: document.getElementById('subDescription').value || undefined
+                    })
+                });
+                const data = await response.json();
+                showResult('createSubcategoryResult', data, !response.ok);
+                if (response.ok) {
+                    document.getElementById('subcategoryId').value = data.data?.subcategory?.id || '';
+                }
+            } catch (error) {
+                showResult('createSubcategoryResult', { error: error.message }, true);
+            }
+        }
+
+        async function updateSubcategory() {
+            const id = document.getElementById('updateSubId').value;
+            if (!id) { alert('Please enter Subcategory ID'); return; }
+            
+            const result = document.getElementById('updateSubcategoryResult');
+            result.textContent = 'Updating...';
+            
+            try {
+                const body = {};
+                const catId = document.getElementById('updateSubCatId').value;
+                const name = document.getElementById('updateSubName').value;
+                const desc = document.getElementById('updateSubDescription').value;
+                
+                if (catId) body.category_id = catId;
+                if (name) body.name = name;
+                if (desc) body.description = desc;
+                
+                const response = await fetch(`${baseUrl()}/subcategories/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${getToken()}`
+                    },
+                    body: JSON.stringify(body)
+                });
+                const data = await response.json();
+                showResult('updateSubcategoryResult', data, !response.ok);
+            } catch (error) {
+                showResult('updateSubcategoryResult', { error: error.message }, true);
+            }
+        }
+
+        async function deleteSubcategory() {
+            const id = document.getElementById('deleteSubId').value;
+            if (!id) { alert('Please enter Subcategory ID'); return; }
+            if (!confirm('Are you sure you want to delete this subcategory?')) return;
+            
+            const result = document.getElementById('deleteSubcategoryResult');
+            result.textContent = 'Deleting...';
+            
+            try {
+                const response = await fetch(`${baseUrl()}/subcategories/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${getToken()}` }
+                });
+                const data = await response.json();
+                showResult('deleteSubcategoryResult', data, !response.ok);
+            } catch (error) {
+                showResult('deleteSubcategoryResult', { error: error.message }, true);
+            }
+        }
+    </script>
+</body>
+</html>

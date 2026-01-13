@@ -1,0 +1,270 @@
+### Categories & Subcategories Testing Collection
+### Use with REST Client extension in VS Code, or import to Postman
+
+@baseUrl = http://localhost:3000/api
+@contentType = application/json
+
+### ============================================
+### AUTHENTICATION - Get Token First
+### ============================================
+
+### 1. Login to get access token (Required for all endpoints)
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "admin@example.com",
+  "password": "AdminPass123!"
+}
+
+### Save the access_token from response above and use it below
+@accessToken = paste-your-access-token-here
+
+### ============================================
+### CATEGORIES ENDPOINTS
+### ============================================
+
+### 2. Get All Categories (with subcategories included by default)
+GET {{baseUrl}}/categories
+Authorization: Bearer {{accessToken}}
+
+### 3. Get All Categories (without subcategories)
+GET {{baseUrl}}/categories?includeSubcategories=false
+Authorization: Bearer {{accessToken}}
+
+### 4. Get Category by ID
+GET {{baseUrl}}/categories/{{categoryId}}
+Authorization: Bearer {{accessToken}}
+
+### 5. Create Category - SON (Audio)
+POST {{baseUrl}}/categories
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "name": "SON",
+  "description": "Audio equipment category including microphones, speakers, mixers, and audio processors",
+  "icon": "https://example.com/icons/son.png"
+}
+
+### 6. Create Category - VIDEO
+POST {{baseUrl}}/categories
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "name": "VIDEO",
+  "description": "Video equipment category including cameras, projectors, screens, and video processors",
+  "icon": "https://example.com/icons/video.png"
+}
+
+### 7. Create Category - LUMIERE (Lighting)
+POST {{baseUrl}}/categories
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "name": "LUMIERE",
+  "description": "Lighting equipment category including LED panels, spotlights, strobes, and controllers",
+  "icon": "https://example.com/icons/lumiere.png"
+}
+
+### 8. Update Category
+PUT {{baseUrl}}/categories/{{categoryId}}
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "description": "Updated description for audio equipment",
+  "icon": "https://example.com/icons/son-updated.png"
+}
+
+### 9. Update Category Name
+PUT {{baseUrl}}/categories/{{categoryId}}
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "name": "SON_UPDATED"
+}
+
+### 10. Delete Category (Only if no equipment associated)
+DELETE {{baseUrl}}/categories/{{categoryId}}
+Authorization: Bearer {{accessToken}}
+
+### ============================================
+### SUBCATEGORIES ENDPOINTS
+### ============================================
+
+### 11. Get All Subcategories
+GET {{baseUrl}}/subcategories
+Authorization: Bearer {{accessToken}}
+
+### 12. Get All Subcategories by Category
+GET {{baseUrl}}/subcategories?categoryId={{categoryId}}
+Authorization: Bearer {{accessToken}}
+
+### 13. Get Subcategory by ID
+GET {{baseUrl}}/subcategories/{{subcategoryId}}
+Authorization: Bearer {{accessToken}}
+
+### 14. Create Subcategory - Microphones (under SON category)
+POST {{baseUrl}}/subcategories
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "category_id": "{{categoryId}}",
+  "name": "Microphones",
+  "description": "Wireless and wired microphones, handheld, lapel, and headset microphones"
+}
+
+### 15. Create Subcategory - Speakers (under SON category)
+POST {{baseUrl}}/subcategories
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "category_id": "{{categoryId}}",
+  "name": "Speakers",
+  "description": "Active and passive speakers, monitors, subwoofers"
+}
+
+### 16. Create Subcategory - Mixers (under SON category)
+POST {{baseUrl}}/subcategories
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "category_id": "{{categoryId}}",
+  "name": "Mixers",
+  "description": "Audio mixing consoles, digital and analog mixers"
+}
+
+### 17. Create Subcategory - Cameras (under VIDEO category)
+POST {{baseUrl}}/subcategories
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "category_id": "{{videoCategoryId}}",
+  "name": "Cameras",
+  "description": "Professional cameras, DSLR, camcorders"
+}
+
+### 18. Create Subcategory - Projectors (under VIDEO category)
+POST {{baseUrl}}/subcategories
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "category_id": "{{videoCategoryId}}",
+  "name": "Projectors",
+  "description": "Video projectors, laser projectors, LED walls"
+}
+
+### 19. Create Subcategory - LED Panels (under LUMIERE category)
+POST {{baseUrl}}/subcategories
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "category_id": "{{lumiereCategoryId}}",
+  "name": "LED Panels",
+  "description": "LED panels, strips, and bars for stage lighting"
+}
+
+### 20. Update Subcategory
+PUT {{baseUrl}}/subcategories/{{subcategoryId}}
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "name": "Microphones Updated",
+  "description": "Updated description for microphones"
+}
+
+### 21. Move Subcategory to Different Category
+PUT {{baseUrl}}/subcategories/{{subcategoryId}}
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "category_id": "{{newCategoryId}}"
+}
+
+### 22. Delete Subcategory (Only if no equipment associated)
+DELETE {{baseUrl}}/subcategories/{{subcategoryId}}
+Authorization: Bearer {{accessToken}}
+
+### ============================================
+### TESTING SCENARIOS
+### ============================================
+
+### Test 1: Create Category without Subcategories (Valid)
+POST {{baseUrl}}/categories
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "name": "TEST_CATEGORY",
+  "description": "This is a test category without subcategories"
+}
+
+### Test 2: Create Category with Subcategories (Valid)
+POST {{baseUrl}}/categories
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "name": "TEST_CATEGORY_WITH_SUBS",
+  "description": "This category will have subcategories"
+}
+
+### Then create subcategories for it...
+
+### Test 3: Try to Create Duplicate Category Name (Should Fail - 409)
+POST {{baseUrl}}/categories
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "name": "SON",
+  "description": "Duplicate name test"
+}
+
+### Test 4: Try to Create Subcategory with Duplicate Name in Same Category (Should Fail - 409)
+POST {{baseUrl}}/subcategories
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "category_id": "{{categoryId}}",
+  "name": "Microphones",
+  "description": "Duplicate subcategory test"
+}
+
+### Test 5: Try to Delete Category with Equipment (Should Fail - 400)
+DELETE {{baseUrl}}/categories/{{categoryIdWithEquipment}}
+Authorization: Bearer {{accessToken}}
+
+### Test 6: Try to Access Without Authentication (Should Fail - 401)
+GET {{baseUrl}}/categories
+
+### Test 7: Try to Create Category as Non-Admin (Should Fail - 403)
+POST {{baseUrl}}/categories
+Content-Type: {{contentType}}
+Authorization: Bearer {{nonAdminToken}}
+
+{
+  "name": "UNAUTHORIZED",
+  "description": "This should fail"
+}
+
+### Test 8: Invalid Category ID Format (Should Fail - 400)
+GET {{baseUrl}}/categories/invalid-id-format
+Authorization: Bearer {{accessToken}}
+
+### Test 9: Category Not Found (Should Fail - 404)
+GET {{baseUrl}}/categories/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{accessToken}}

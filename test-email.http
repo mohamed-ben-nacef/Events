@@ -1,0 +1,70 @@
+### Email Testing Collection for Audiovisual Event Manager
+### Use with REST Client extension in VS Code, or import to Postman
+
+@baseUrl = http://localhost:3000/api
+@contentType = application/json
+
+### 1. Register New User (Sends Welcome + Verification Email)
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "email": "test@example.com",
+  "password": "TestPass123!",
+  "full_name": "Test User",
+  "phone": "+1234567890",
+  "role": "TECHNICIEN"
+}
+
+### 2. Login (Get Access Token)
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "test@example.com",
+  "password": "TestPass123!"
+}
+
+### 3. Forgot Password (Sends Reset Email)
+POST {{baseUrl}}/auth/forgot-password
+Content-Type: {{contentType}}
+
+{
+  "email": "test@example.com"
+}
+
+### 4. Reset Password (Use token from email)
+POST {{baseUrl}}/auth/reset-password
+Content-Type: {{contentType}}
+
+{
+  "token": "paste-reset-token-here",
+  "password": "NewPassword123!"
+}
+
+### 5. Verify Email (Use token from registration email)
+POST {{baseUrl}}/auth/verify-email
+Content-Type: {{contentType}}
+
+{
+  "token": "paste-verification-token-here"
+}
+
+### 6. Resend Verification Email (Requires Authentication)
+POST {{baseUrl}}/auth/resend-verification
+Content-Type: {{contentType}}
+Authorization: Bearer paste-access-token-here
+
+### 7. Change Password (Requires Authentication - Sends Notification Email)
+PUT {{baseUrl}}/auth/change-password
+Content-Type: {{contentType}}
+Authorization: Bearer paste-access-token-here
+
+{
+  "current_password": "TestPass123!",
+  "new_password": "NewPassword123!"
+}
+
+### 8. Get Current User Profile
+GET {{baseUrl}}/auth/me
+Authorization: Bearer paste-access-token-here
