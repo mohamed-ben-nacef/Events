@@ -8,6 +8,12 @@ import { sequelize } from './models';
 import authRoutes from './routes/auth.routes';
 import categoryRoutes from './routes/category.routes';
 import subcategoryRoutes from './routes/subcategory.routes';
+import equipmentRoutes from './routes/equipment.routes';
+import eventRoutes from './routes/event.routes';
+import maintenanceRoutes from './routes/maintenance.routes';
+import vehicleRoutes from './routes/vehicle.routes';
+import whatsappRoutes from './routes/whatsapp.routes';
+import activityLogRoutes from './routes/activityLog.routes';
 import { errorHandler } from './middleware/errorHandler';
 import { apiLimiter } from './middleware/rateLimiter';
 
@@ -45,6 +51,12 @@ app.get('/api/db-check', async (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/subcategories', subcategoryRoutes);
+app.use('/api/equipment', equipmentRoutes);
+app.use('/api/events', eventRoutes);
+app.use('/api/maintenances', maintenanceRoutes);
+app.use('/api/vehicles', vehicleRoutes);
+app.use('/api/whatsapp-messages', whatsappRoutes);
+app.use('/api/activity-logs', activityLogRoutes);
 
 // 404 handler
 app.use((req, res) => {
