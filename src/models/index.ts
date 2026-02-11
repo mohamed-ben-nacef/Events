@@ -12,6 +12,7 @@ import Vehicle from './Vehicle';
 import Transport from './Transport';
 import WhatsappMessage from './WhatsappMessage';
 import ActivityLog from './ActivityLog';
+import MaintenanceLog from './MaintenanceLog';
 
 // --- AUTHENTICATION & USERS ---
 // No extra relations for now apart from those below
@@ -62,6 +63,10 @@ Maintenance.belongsTo(User, { foreignKey: 'technician_id', as: 'technician' });
 Maintenance.hasMany(EquipmentStatus, { foreignKey: 'related_maintenance_id', as: 'equipment_statuses' });
 EquipmentStatus.belongsTo(Maintenance, { foreignKey: 'related_maintenance_id', as: 'related_maintenance' });
 
+Maintenance.hasMany(MaintenanceLog, { foreignKey: 'maintenance_id', as: 'logs' });
+MaintenanceLog.belongsTo(Maintenance, { foreignKey: 'maintenance_id', as: 'maintenance' });
+MaintenanceLog.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+
 // --- VEHICLES & TRANSPORT ---
 Event.hasMany(Transport, { foreignKey: 'event_id', as: 'transports' });
 Transport.belongsTo(Event, { foreignKey: 'event_id', as: 'event' });
@@ -98,5 +103,6 @@ export {
   Transport,
   WhatsappMessage,
   ActivityLog,
+  MaintenanceLog,
 };
 

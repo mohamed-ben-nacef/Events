@@ -1,11 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
-import Event from '../models/Event';
-import EventEquipment from '../models/EventEquipment';
-import EventTechnician from '../models/EventTechnician';
-import Equipment from '../models/Equipment';
-import EquipmentStatus from '../models/EquipmentStatus';
-import User from '../models/User';
-import Category from '../models/Category';
+import PDFDocument from 'pdfkit';
+import {
+  User,
+  Category,
+  Subcategory,
+  Equipment,
+  EquipmentStatus,
+  Event,
+  EventEquipment,
+  EventTechnician
+} from '../models';
 import {
   NotFoundError,
   ValidationError,
@@ -72,59 +76,69 @@ export const getAllEvents = asyncHandler(
 export const getEventById = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
     const id = req.params.id as string;
+    console.log(`Backend: Fetching event by ID: ${id}`);
 
-    const event = await Event.findByPk(id, {
-      include: [
-        {
-          model: User,
-          as: 'creator',
-          attributes: ['id', 'full_name', 'email'],
-        },
-        {
-          model: EventEquipment,
-          as: 'equipment_reservations',
-          include: [
-            {
-              model: Equipment,
-              as: 'equipment',
-              include: [
-                {
-                  model: Category,
-                  as: 'category',
-                },
-                {
-                  model: Category,
-                  as: 'subcategory',
-                  required: false,
-                },
-              ],
-            },
-          ],
-        },
-        {
-          model: EventTechnician,
-          as: 'technician_assignments',
-          include: [
-            {
-              model: User,
-              as: 'technician',
-              attributes: ['id', 'full_name', 'email', 'phone'],
-            },
-          ],
-        },
-      ],
-    });
+    try {
+      console.log(`Backend: Executing full findByPk for event ${id}`);
+      const event = await Event.findByPk(id, {
+        include: [
+          {
+            model: User,
+            as: 'creator',
+            attributes: ['id', 'full_name', 'email'],
+          },
+          {
+            model: EventEquipment,
+            as: 'equipment_reservations',
+            include: [
+              {
+                model: Equipment,
+                as: 'equipment',
+                include: [
+                  {
+                    model: Category,
+                    as: 'category',
+                  },
+                  {
+                    model: Subcategory,
+                    as: 'subcategory',
+                    required: false,
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            model: EventTechnician,
+            as: 'technician_assignments',
+            include: [
+              {
+                model: User,
+                as: 'technician',
+                attributes: ['id', 'full_name', 'email', 'phone'],
+              },
+            ],
+          },
+        ],
+      });
+      console.log(`Backend: findByPk successful for event ${id}`);
 
-    if (!event) {
-      throw new NotFoundError('Event not found');
+      if (!event) {
+        console.log(`Backend: Event not found with ID: ${id}`);
+        throw new NotFoundError('Event not found');
+      }
+
+      console.log(`Backend: Event fetched successfully: ${event.id}`);
+      res.json({
+        success: true,
+        data: {
+          event,
+        },
+      });
+    } catch (error: any) {
+      console.error(`Backend: Error fetching event ${id}:`, error);
+      next(error);
     }
-
-    res.json({
-      success: true,
-      data: {
-        event,
-      },
-    });
   }
 );
 
@@ -507,6 +521,62 @@ export const updateEquipmentReservation = asyncHandler(
   }
 );
 
+// Remove equipment reservation
+export const removeEquipmentReservation = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      throw new ValidationError('User not authenticated');
+    }
+
+    const eventId = req.params.eventId as string;
+    const reservationId = req.params.reservationId as string;
+
+    const reservation = await EventEquipment.findOne({
+      where: {
+        id: reservationId,
+        event_id: eventId,
+      },
+      include: [
+        {
+          model: Equipment,
+          as: 'equipment',
+        },
+      ],
+    });
+
+    if (!reservation) {
+      throw new NotFoundError('Reservation not found');
+    }
+
+    const equipment = (reservation as any).equipment;
+
+    // Restore equipment available quantity
+    const newAvailable = Math.min(
+      equipment.quantity_total,
+      equipment.quantity_available + reservation.quantity_reserved
+    );
+    await equipment.update({ quantity_available: newAvailable });
+
+    // Create equipment status entry
+    await EquipmentStatus.create({
+      equipment_id: equipment.id,
+      status: 'DISPONIBLE',
+      quantity: reservation.quantity_reserved,
+      related_event_id: eventId,
+      changed_by: req.user.id,
+      notes: `Reservation removed for event: ${eventId}`,
+    });
+
+    // Delete reservation
+    await reservation.destroy();
+
+    res.json({
+      success: true,
+      message: 'Equipment reservation removed successfully',
+    });
+  }
+);
+
 // Return equipment
 export const returnEquipment = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
@@ -711,5 +781,179 @@ export const removeTechnician = asyncHandler(
       success: true,
       message: 'Technician removed from event',
     });
+  }
+);
+
+// Get all equipment for an event
+export const getEventEquipment = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const eventId = req.params.eventId as string;
+    console.log(`Backend: Fetching equipment for event: ${eventId}`);
+
+    try {
+      const eventEquipment = await EventEquipment.findAll({
+        where: { event_id: eventId },
+        include: [
+          {
+            model: Equipment,
+            as: 'equipment',
+            include: [
+              {
+                model: Category,
+                as: 'category',
+              },
+              {
+                model: Subcategory,
+                as: 'subcategory',
+              },
+            ],
+          },
+        ],
+      });
+
+      res.json({
+        success: true,
+        data: {
+          equipment: eventEquipment,
+        },
+      });
+    } catch (error: any) {
+      console.error(`Backend: Error fetching event equipment for ${eventId}:`, error);
+      next(error);
+    }
+  }
+);
+
+// Get all technicians for an event
+export const getEventTechnicians = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const eventId = req.params.eventId as string;
+
+    const assignments = await EventTechnician.findAll({
+      where: { event_id: eventId },
+      include: [
+        {
+          model: User,
+          as: 'technician',
+          attributes: ['id', 'full_name', 'email', 'phone'],
+        },
+      ],
+    });
+
+    res.json({
+      success: true,
+      data: {
+        assignments,
+      },
+    });
+  }
+);
+
+// Generate Event Documents (PDF)
+export const getEventDocuments = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const id = req.params.id as string;
+    const type = req.params.type as string;
+
+    const event = await Event.findByPk(id, {
+      include: [
+        {
+          model: EventEquipment,
+          as: 'equipment_reservations',
+          include: [{ model: Equipment, as: 'equipment' }]
+        },
+        {
+          model: EventTechnician,
+          as: 'technician_assignments',
+          include: [{ model: User, as: 'technician', attributes: ['full_name'] }]
+        }
+      ]
+    });
+
+    if (!event) throw new NotFoundError('Event not found');
+
+    const doc = new PDFDocument({ margin: 50 });
+    let filename = `Document_${type}_${event.event_name.replace(/\s+/g, '_')}.pdf`;
+
+    // Header
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    doc.pipe(res);
+
+    // --- DESIGN ---
+    // Shop Logo / Name
+    doc.fillColor('#1e293b').fontSize(24).text('MARABOUT EVENTS', { align: 'right' });
+    doc.fontSize(10).text('Service Logistique & Technique', { align: 'right' });
+    doc.moveDown(2);
+
+    // Document Title
+    const titleMap: Record<string, string> = {
+      'picking-list': 'LISTE DE COLLISAGE / PICKING LIST',
+      'plan-de-feu': 'PLAN DE FEU TECHNIQUE',
+      'bon-sortie': 'BON DE SORTIE MATÉRIEL',
+      'BON_SORTIE': 'BON DE SORTIE MATÉRIEL',
+      'BON_RETOUR': 'BON DE RETOUR MATÉRIEL',
+      'FICHE_MATERIEL': 'FICHE TECHNIQUE RÉCAPITULATIVE'
+    };
+
+    doc.rect(50, doc.y, 500, 40).fill('#f8fafc');
+    doc.fillColor('#0f172a').fontSize(16).text(titleMap[type] || 'DOCUMENT ÉVÈNEMENT', 60, doc.y + 12, { characterSpacing: 1 });
+    doc.moveDown(3);
+
+    // Event Details Grid
+    const startY = doc.y;
+    doc.fillColor('#64748b').fontSize(9).text('ÉVÈNEMENT:', 50, startY);
+    doc.fillColor('#1e293b').fontSize(11).text(event.event_name, 150, startY);
+
+    doc.fillColor('#64748b').fontSize(9).text('CLIENT:', 50, startY + 20);
+    doc.fillColor('#1e293b').fontSize(11).text(event.client_name, 150, startY + 20);
+
+    doc.fillColor('#64748b').fontSize(9).text('DATE:', 50, startY + 40);
+    doc.fillColor('#1e293b').fontSize(11).text(new Date(event.event_date).toLocaleDateString('fr-FR'), 150, startY + 40);
+
+    doc.fillColor('#64748b').fontSize(9).text('LIEU:', 350, startY);
+    doc.fillColor('#1e293b').fontSize(11).text(event.address, 420, startY, { width: 130 });
+
+    doc.moveDown(4);
+
+    // Equipment Table Header
+    doc.rect(50, doc.y, 500, 20).fill('#1e293b');
+    doc.fillColor('#ffffff').fontSize(10).text('MATÉRIEL / ÉQUIPEMENT', 60, doc.y + 5);
+    doc.text('REQUIS', 400, doc.y - 10);
+    doc.text('VÉRIF', 480, doc.y - 10);
+    doc.moveDown(1.5);
+
+    // Table Content
+    (event as any).equipment_reservations?.forEach((res: any, index: number) => {
+      const itemY = doc.y;
+      if (itemY > 700) doc.addPage();
+
+      const item = res.equipment;
+      doc.fillColor(index % 2 === 0 ? '#1e293b' : '#334155').fontSize(10);
+      doc.text(item.name, 60, itemY + 5);
+
+      doc.fontSize(7).fillColor('#64748b').text(`${item.brand || ''} ${item.model || ''}`, 60, doc.y + 2);
+
+      doc.fillColor('#1e293b').fontSize(10).text(res.quantity_reserved.toString(), 400, itemY + 8);
+
+      // Verification box
+      doc.rect(480, itemY + 5, 15, 15).strokeColor('#cbd5e1').lineWidth(1).stroke();
+
+      // Line separator
+      doc.moveTo(50, doc.y + 10).lineTo(550, doc.y + 10).strokeColor('#f1f5f9').lineWidth(0.5).stroke();
+      doc.moveDown(2);
+    });
+
+    // Footer / Signatures
+    const footY = 700;
+    doc.moveTo(50, footY).lineTo(550, footY).strokeColor('#000000').lineWidth(1).stroke();
+
+    doc.fillColor('#64748b').fontSize(9).text('Visa Logistique', 50, footY + 10);
+    doc.text('Signature Client', 450, footY + 10);
+
+    doc.fontSize(8).text('Généré automatiquement par Events Manager PRO', 50, 750, { align: 'center' });
+
+    doc.end();
   }
 );

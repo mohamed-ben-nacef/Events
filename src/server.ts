@@ -14,6 +14,7 @@ import maintenanceRoutes from './routes/maintenance.routes';
 import vehicleRoutes from './routes/vehicle.routes';
 import whatsappRoutes from './routes/whatsapp.routes';
 import activityLogRoutes from './routes/activityLog.routes';
+import userRoutes from './routes/user.routes';
 import { errorHandler } from './middleware/errorHandler';
 import { apiLimiter } from './middleware/rateLimiter';
 
@@ -29,8 +30,25 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
 // Apply rate limiting to all API routes
 app.use('/api', apiLimiter);
+
+import path from 'path';
+import fs from 'fs';
+
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir);
+}
+
+// Serve uploaded files statically
+app.use('/uploads', express.static(uploadsDir));
 
 // Health Check
 app.get('/api/health', (req, res) => {
@@ -57,6 +75,7 @@ app.use('/api/maintenances', maintenanceRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/whatsapp-messages', whatsappRoutes);
 app.use('/api/activity-logs', activityLogRoutes);
+app.use('/api/users', userRoutes);
 
 // 404 handler
 app.use((req, res) => {

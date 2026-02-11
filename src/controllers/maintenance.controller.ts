@@ -3,6 +3,7 @@ import Maintenance from '../models/Maintenance';
 import Equipment from '../models/Equipment';
 import EquipmentStatus from '../models/EquipmentStatus';
 import User from '../models/User';
+import MaintenanceLog from '../models/MaintenanceLog';
 import {
   NotFoundError,
   ValidationError,
@@ -81,7 +82,21 @@ export const getMaintenanceById = asyncHandler(
           as: 'technician',
           attributes: ['id', 'full_name', 'email', 'phone'],
         },
+        {
+          model: MaintenanceLog,
+          as: 'logs',
+          include: [
+            {
+              model: User,
+              as: 'user',
+              attributes: ['id', 'full_name'],
+            }
+          ]
+        }
       ],
+      order: [
+        [{ model: MaintenanceLog, as: 'logs' }, 'created_at', 'DESC']
+      ]
     });
 
     if (!maintenance) {
@@ -111,8 +126,25 @@ export const createMaintenance = asyncHandler(
       priority = 'MOYENNE',
       start_date,
       expected_end_date,
-      photos,
     } = req.body;
+
+    // Handle file uploads
+    let photos: string[] = [];
+
+    // Add uploaded files
+    if (req.files && Array.isArray(req.files)) {
+      const fileUrls = (req.files as Express.Multer.File[]).map(file => file.path);
+      photos = [...photos, ...fileUrls];
+    }
+
+    // Add existing photo URLs from body (if any were passed as strings)
+    if (req.body.photos) {
+      if (Array.isArray(req.body.photos)) {
+        photos = [...photos, ...req.body.photos];
+      } else {
+        photos.push(req.body.photos);
+      }
+    }
 
     // Verify equipment exists
     const equipment = await Equipment.findByPk(equipment_id);
@@ -134,15 +166,18 @@ export const createMaintenance = asyncHandler(
       priority,
       start_date,
       expected_end_date: expected_end_date || undefined,
-      photos: photos || undefined,
+      photos: photos.length > 0 ? photos : undefined,
       status: 'EN_ATTENTE',
     });
 
-    // Update equipment status to EN_MAINTENANCE
-    const maintenanceQuantity = equipment.quantity_available;
-    await equipment.update({
-      quantity_available: 0, // All available items go to maintenance
-    });
+    // Check if equipment has available quantity
+    if (equipment.quantity_available < 1) {
+      throw new ValidationError('No available equipment to send to maintenance');
+    }
+
+    // Update equipment status: Decrement quantity available by 1
+    const maintenanceQuantity = 1;
+    await equipment.decrement('quantity_available', { by: 1 });
 
     // Create equipment status entry
     await EquipmentStatus.create({
@@ -199,13 +234,35 @@ export const updateMaintenance = asyncHandler(
       'cost',
       'status',
       'solution_description',
-      'photos',
     ];
 
     for (const field of allowedFields) {
       if (req.body[field] !== undefined) {
         updateData[field] = req.body[field];
       }
+    }
+
+    // Handle photos update (merge kept URLs + new file URLs)
+    // Only update photos if either body.photos or files are present
+    if (req.body.photos || (req.files && Array.isArray(req.files) && req.files.length > 0)) {
+      let finalPhotos: string[] = [];
+
+      // 1. Add kept existing photos (from body)
+      if (req.body.photos) {
+        if (Array.isArray(req.body.photos)) {
+          finalPhotos = [...req.body.photos];
+        } else {
+          finalPhotos.push(req.body.photos);
+        }
+      }
+
+      // 2. Add new uploaded photos
+      if (req.files && Array.isArray(req.files)) {
+        const newFileUrls = (req.files as Express.Multer.File[]).map(file => file.path);
+        finalPhotos = [...finalPhotos, ...newFileUrls];
+      }
+
+      updateData.photos = finalPhotos;
     }
 
     // Verify technician if being updated
@@ -279,17 +336,15 @@ export const completeMaintenance = asyncHandler(
       photos: photos || maintenance.photos,
     });
 
-    // Update equipment status back to DISPONIBLE
+    // Update equipment status back to DISPONIBLE (Increment quantity)
     const equipment = (maintenance as any).equipment;
-    await equipment.update({
-      quantity_available: equipment.quantity_total, // All items available again
-    });
+    await equipment.increment('quantity_available', { by: 1 });
 
     // Create equipment status entry
     await EquipmentStatus.create({
       equipment_id: equipment.id,
       status: 'DISPONIBLE',
-      quantity: equipment.quantity_total,
+      quantity: 1,
       related_maintenance_id: maintenance.id,
       changed_by: req.user.id,
       notes: `Maintenance completed: ${solution_description}`,
@@ -340,6 +395,52 @@ export const deleteMaintenance = asyncHandler(
     res.json({
       success: true,
       message: 'Maintenance record deleted successfully',
+    });
+  }
+);
+
+// Add log/comment to maintenance
+export const addMaintenanceLog = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const id = req.params.id as string;
+    const { content, type = 'COMMENT' } = req.body;
+
+    const maintenance = await Maintenance.findByPk(id);
+    if (!maintenance) {
+      throw new NotFoundError('Maintenance record not found');
+    }
+
+    // Handle file uploads
+    let photos: string[] = [];
+    if (req.files && Array.isArray(req.files)) {
+      photos = (req.files as Express.Multer.File[]).map(file => file.path);
+    }
+
+    const log = await MaintenanceLog.create({
+      maintenance_id: id,
+      user_id: req.user!.id,
+      content,
+      photos: photos.length > 0 ? photos : undefined,
+      type: type as any,
+    });
+
+    // Fetch log with user
+    const logWithUser = await MaintenanceLog.findByPk(log.id, {
+      include: [
+        {
+          model: User,
+          as: 'user',
+          attributes: ['id', 'full_name'],
+        }
+      ]
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Log added successfully',
+      data: {
+        log: logWithUser,
+      },
     });
   }
 );

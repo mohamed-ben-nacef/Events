@@ -24,27 +24,28 @@ import {
 
 const router = Router();
 
-// All routes require authentication
-router.use(authenticate);
-
 // Category routes
 router.get('/', getAllCategories);
+
+// All other routes require authentication
+router.use(authenticate);
+
 router.get('/:id', validate(categoryIdValidator), getCategoryById);
 router.post(
   '/',
-  authorize('ADMIN'),
+  authorize('ADMIN', 'MAINTENANCE'),
   validate(createCategoryValidator),
   createCategory
 );
 router.put(
   '/:id',
-  authorize('ADMIN'),
+  authorize('ADMIN', 'MAINTENANCE'),
   validate(updateCategoryValidator),
   updateCategory
 );
 router.delete(
   '/:id',
-  authorize('ADMIN'),
+  authorize('ADMIN', 'MAINTENANCE'),
   validate(categoryIdValidator),
   deleteCategory
 );

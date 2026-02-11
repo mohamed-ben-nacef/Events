@@ -15,17 +15,21 @@ import { Op } from 'sequelize';
 // Get all equipment with pagination and filtering
 export const getAllEquipment = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
+    console.log('getAllEquipment query:', req.query);
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = (page - 1) * limit;
 
     // Build where clause
     const whereClause: any = {};
-    if (req.query.categoryId) {
-      whereClause.category_id = req.query.categoryId;
+    const categoryId = req.query.categoryId || req.query.category_id;
+    const subcategoryId = req.query.subcategoryId || req.query.subcategory_id;
+
+    if (categoryId) {
+      whereClause.category_id = categoryId;
     }
-    if (req.query.subcategoryId) {
-      whereClause.subcategory_id = req.query.subcategoryId;
+    if (subcategoryId) {
+      whereClause.subcategory_id = subcategoryId;
     }
     if (req.query.search) {
       whereClause[Op.or] = [

@@ -15,8 +15,8 @@ export const createEventValidator: ValidationChain[] = [
     .withMessage('Contact person must be between 1 and 255 characters'),
   body('phone')
     .trim()
-    .isLength({ min: 10, max: 20 })
-    .withMessage('Phone number must be between 10 and 20 characters')
+    .isLength({ min: 8, max: 20 })
+    .withMessage('Phone number must be between 8 and 20 characters')
     .matches(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/)
     .withMessage('Please provide a valid phone number'),
   body('email')
@@ -88,8 +88,8 @@ export const updateEventValidator: ValidationChain[] = [
   body('phone')
     .optional()
     .trim()
-    .isLength({ min: 10, max: 20 })
-    .withMessage('Phone number must be between 10 and 20 characters'),
+    .isLength({ min: 8, max: 20 })
+    .withMessage('Phone number must be between 8 and 20 characters'),
   body('email')
     .optional()
     .trim()

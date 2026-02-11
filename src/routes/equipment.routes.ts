@@ -20,9 +20,6 @@ import {
 
 const router = Router();
 
-// All routes require authentication
-router.use(authenticate);
-
 // Equipment routes
 router.get(
   '/',
@@ -34,6 +31,9 @@ router.get(
   validate(equipmentIdValidator),
   getEquipmentById
 );
+
+// All other routes require authentication
+router.use(authenticate);
 router.post(
   '/',
   authorize('ADMIN', 'MAINTENANCE'),

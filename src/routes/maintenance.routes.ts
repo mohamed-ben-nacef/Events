@@ -6,6 +6,7 @@ import {
   updateMaintenance,
   completeMaintenance,
   deleteMaintenance,
+  addMaintenanceLog,
 } from '../controllers/maintenance.controller';
 import { authenticate, authorize } from '../middleware/auth';
 import { validate } from '../middleware/validation';
@@ -16,6 +17,8 @@ import {
   maintenanceIdValidator,
   maintenanceQueryValidator,
 } from '../validators/maintenance.validator';
+
+import { upload } from '../middleware/upload';
 
 const router = Router();
 
@@ -36,18 +39,20 @@ router.get(
 router.post(
   '/',
   authorize('ADMIN', 'MAINTENANCE', 'TECHNICIEN'),
-  validate(createMaintenanceValidator),
+  upload.array('photos', 5),
   createMaintenance
 );
 router.put(
   '/:id',
   authorize('ADMIN', 'MAINTENANCE', 'TECHNICIEN'),
+  upload.array('photos', 5),
   validate(updateMaintenanceValidator),
   updateMaintenance
 );
 router.post(
   '/:id/complete',
   authorize('ADMIN', 'MAINTENANCE', 'TECHNICIEN'),
+  upload.array('photos', 5),
   validate(completeMaintenanceValidator),
   completeMaintenance
 );
@@ -56,6 +61,13 @@ router.delete(
   authorize('ADMIN'),
   validate(maintenanceIdValidator),
   deleteMaintenance
+);
+
+router.post(
+  '/:id/logs',
+  authorize('ADMIN', 'MAINTENANCE', 'TECHNICIEN'),
+  upload.array('photos', 5),
+  addMaintenanceLog
 );
 
 export default router;

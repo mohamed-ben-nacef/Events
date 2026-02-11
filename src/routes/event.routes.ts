@@ -11,6 +11,10 @@ import {
   assignTechnician,
   markTechnicianPrepared,
   removeTechnician,
+  removeEquipmentReservation,
+  getEventEquipment,
+  getEventTechnicians,
+  getEventDocuments,
 } from '../controllers/event.controller';
 import { authenticate, authorize } from '../middleware/auth';
 import { validate } from '../middleware/validation';
@@ -59,6 +63,10 @@ router.delete(
 );
 
 // Equipment reservation routes
+router.get(
+  '/:eventId/equipment',
+  getEventEquipment
+);
 router.post(
   '/:eventId/equipment',
   validate(reserveEquipmentValidator),
@@ -74,8 +82,16 @@ router.post(
   validate(returnEquipmentValidator),
   returnEquipment
 );
+router.delete(
+  '/:eventId/equipment/:reservationId',
+  removeEquipmentReservation
+);
 
 // Technician assignment routes
+router.get(
+  '/:eventId/technicians',
+  getEventTechnicians
+);
 router.post(
   '/:eventId/technicians',
   validate(assignTechnicianValidator),
@@ -88,6 +104,13 @@ router.put(
 router.delete(
   '/:eventId/technicians/:assignmentId',
   removeTechnician
+);
+
+// Document routes
+router.get(
+  '/:id/documents/:type',
+  validate(eventIdValidator),
+  getEventDocuments
 );
 
 export default router;
