@@ -21,6 +21,13 @@ import { apiLimiter } from './middleware/rateLimiter';
 dotenv.config();
 
 const app = express();
+
+// If the app is running behind a proxy (load balancer / platform like Render,
+// Heroku, etc.) trust the proxy so that express and middleware (like
+// express-rate-limit) can correctly read the client's IP from
+// X-Forwarded-For. Set to 1 when there's a single proxy in front of the app.
+// See: https://expressjs.com/en/guide/behind-proxies.html
+app.set('trust proxy', 1);
 const port = process.env.PORT || 3000;
 
 // Security middleware
