@@ -9,7 +9,7 @@ import {
 } from '../utils/errors';
 import { asyncHandler } from '../middleware/errorHandler';
 import { Op } from 'sequelize';
-// Note: Twilio integration would go here in production
+import whatsappService from '../services/whatsapp.service';
 
 // Get all WhatsApp messages
 export const getAllWhatsAppMessages = asyncHandler(
@@ -103,10 +103,14 @@ export const sendWhatsAppMessage = asyncHandler(
       throw new ValidationError('User not authenticated');
     }
 
+    console.log('--- Send WhatsApp Request ---');
+    console.log('Body:', JSON.stringify(req.body, null, 2));
+
     const {
       recipient_phone,
       recipient_name,
       message_content,
+      template_name,
       message_type,
       event_id,
     } = req.body;
@@ -130,20 +134,22 @@ export const sendWhatsAppMessage = asyncHandler(
       sent_by: req.user.id,
     });
 
-    // TODO: Integrate with Twilio API to actually send message
-    // For now, we'll simulate sending
+    // Send message using Meta service
     try {
-      // In production, this would call Twilio API
-      // const twilioResponse = await twilioClient.messages.create({...});
-      // await message.update({
-      //   twilio_message_sid: twilioResponse.sid,
-      //   status: 'ENVOYE',
-      // });
+      let metaResponse;
+      if (template_name) {
+        metaResponse = await whatsappService.sendTemplateMessage(recipient_phone, template_name);
+        // If it's a template, update content with placeholder if empty
+        if (!message_content) {
+          await message.update({ message_content: `[Template: ${template_name}]` });
+        }
+      } else {
+        metaResponse = await whatsappService.sendMessage(recipient_phone, message_content);
+      }
 
-      // Simulate success for now
       await message.update({
-        twilio_message_sid: `SM${Date.now()}`,
-        status: 'ENVOYE',
+        twilio_message_sid: metaResponse.id,
+        status: metaResponse.status === 'failed' ? 'ECHOUE' : 'ENVOYE',
       });
 
       console.log(`📱 WhatsApp message sent to ${recipient_phone}: ${message_content.substring(0, 50)}...`);
@@ -152,7 +158,7 @@ export const sendWhatsAppMessage = asyncHandler(
         status: 'ECHOUE',
         error_message: error.message,
       });
-      throw new ValidationError(`Failed to send WhatsApp message: ${error.message}`);
+      console.error(`Failed to send WhatsApp message to ${recipient_phone}:`, error.message);
     }
 
     // Fetch with relations
@@ -231,10 +237,19 @@ export const sendEventInvitation = asyncHandler(
         sent_by: req.user.id,
       });
 
-      // TODO: Send via Twilio
-      await message.update({
-        twilio_message_sid: `SM${Date.now()}-${technician.id}`,
-      });
+      // Send via Twilio
+      try {
+        const metaResponse = await whatsappService.sendMessage(technician.phone, messageContent);
+        await message.update({
+          twilio_message_sid: metaResponse.id,
+          status: metaResponse.status === 'failed' ? 'ECHOUE' : 'ENVOYE',
+        });
+      } catch (error: any) {
+        await message.update({
+          status: 'ECHOUE',
+          error_message: error.message,
+        });
+      }
 
       messages.push(message);
     }
@@ -299,10 +314,19 @@ export const sendEventReminder = asyncHandler(
         sent_by: req.user.id,
       });
 
-      // TODO: Send via Twilio
-      await message.update({
-        twilio_message_sid: `SM${Date.now()}-${technician.id}`,
-      });
+      // Send via Twilio
+      try {
+        const metaResponse = await whatsappService.sendMessage(technician.phone, messageContent);
+        await message.update({
+          twilio_message_sid: metaResponse.id,
+          status: metaResponse.status === 'failed' ? 'ECHOUE' : 'ENVOYE',
+        });
+      } catch (error: any) {
+        await message.update({
+          status: 'ECHOUE',
+          error_message: error.message,
+        });
+      }
 
       messages.push(message);
     }
@@ -317,51 +341,73 @@ export const sendEventReminder = asyncHandler(
   }
 );
 
-// Update message status (webhook for Twilio)
+// Verify webhook (GET request from Meta)
+export const verifyWebhook = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+
+    if (mode === 'subscribe' && token === process.env.WHATSAPP_VERIFY_TOKEN) {
+      console.log('✅ WhatsApp Webhook verified');
+      res.status(200).send(challenge);
+    } else {
+      res.status(403).json({ success: false, message: 'Verification failed' });
+    }
+  }
+);
+
+// Update message status (webhook for Meta)
 export const updateMessageStatus = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
-    const { MessageSid, MessageStatus } = req.body;
+    const body = req.body;
 
-    if (!MessageSid) {
-      throw new ValidationError('MessageSid is required');
+    // Meta sends multiple entries and changes
+    if (body.object === 'whatsapp_business_account') {
+      if (
+        body.entry &&
+        body.entry[0].changes &&
+        body.entry[0].changes[0].value.statuses &&
+        body.entry[0].changes[0].value.statuses[0]
+      ) {
+        const { id, status: metaStatus } = body.entry[0].changes[0].value.statuses[0];
+
+        const message = await WhatsappMessage.findOne({
+          where: { twilio_message_sid: id },
+        });
+
+        if (message) {
+          let status: 'ENVOYE' | 'LIVRE' | 'LU' | 'ECHOUE' = 'ENVOYE';
+          const updateData: any = {};
+
+          switch (metaStatus) {
+            case 'delivered':
+              status = 'LIVRE';
+              updateData.delivered_at = new Date();
+              break;
+            case 'read':
+              status = 'LU';
+              updateData.read_at = new Date();
+              break;
+            case 'failed':
+              status = 'ECHOUE';
+              updateData.error_message = `Message failed: ${metaStatus}`;
+              break;
+            case 'sent':
+              status = 'ENVOYE';
+              break;
+          }
+
+          await message.update({
+            status,
+            ...updateData,
+          });
+        }
+      }
+      res.status(200).json({ success: true });
+    } else {
+      res.sendStatus(404);
     }
-
-    const message = await WhatsappMessage.findOne({
-      where: { twilio_message_sid: MessageSid },
-    });
-
-    if (!message) {
-      throw new NotFoundError('Message not found');
-    }
-
-    let status = 'ENVOYE';
-    const updateData: any = {};
-
-    switch (MessageStatus) {
-      case 'delivered':
-        status = 'LIVRE';
-        updateData.delivered_at = new Date();
-        break;
-      case 'read':
-        status = 'LU';
-        updateData.read_at = new Date();
-        break;
-      case 'failed':
-      case 'undelivered':
-        status = 'ECHOUE';
-        updateData.error_message = `Message failed: ${MessageStatus}`;
-        break;
-    }
-
-    await message.update({
-      status,
-      ...updateData,
-    });
-
-    res.json({
-      success: true,
-      message: 'Status updated',
-    });
   }
 );
 

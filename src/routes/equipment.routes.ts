@@ -36,7 +36,7 @@ router.get(
 router.use(authenticate);
 router.post(
   '/',
-  authorize('ADMIN', 'MAINTENANCE'),
+  authorize('ADMIN', 'MAINTENANCE', 'TECHNICIEN'),
   validate(createEquipmentValidator),
   createEquipment
 );

@@ -12,12 +12,15 @@ if (!dbUrl) {
 
 const sequelize = new Sequelize(dbUrl, {
   dialect: 'postgres',
+  // dialectOptions: {
+  //   ssl: {
+  //     require: true,
+  //     rejectUnauthorized: false // important for Render
+  //   }
+  // }
   dialectOptions: {
-    ssl: {
-      require: true,
-      rejectUnauthorized: false // important for Render
-    }
-  }
+    ssl: false  // 👈 explicitly disable SSL
+  },
 });
 
 export default sequelize;

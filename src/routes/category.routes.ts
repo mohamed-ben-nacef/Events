@@ -33,7 +33,7 @@ router.use(authenticate);
 router.get('/:id', validate(categoryIdValidator), getCategoryById);
 router.post(
   '/',
-  authorize('ADMIN', 'MAINTENANCE'),
+  authorize('ADMIN', 'MAINTENANCE', 'TECHNICIEN'),
   validate(createCategoryValidator),
   createCategory
 );

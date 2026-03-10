@@ -157,6 +157,7 @@ export const login = asyncHandler(
 
     // Verify password
     const isPasswordValid = await comparePassword(password, user.password_hash);
+
     if (!isPasswordValid) {
       throw new UnauthorizedError('Invalid email or password');
     }

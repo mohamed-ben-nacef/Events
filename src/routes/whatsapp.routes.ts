@@ -6,6 +6,7 @@ import {
   sendEventInvitation,
   sendEventReminder,
   updateMessageStatus,
+  verifyWebhook,
   getMessagesByEvent,
 } from '../controllers/whatsapp.controller';
 import { authenticate } from '../middleware/auth';
@@ -20,7 +21,8 @@ import {
 
 const router = Router();
 
-// Public webhook route (no auth required for Twilio)
+// Public webhook routes (no auth required for Meta)
+router.get('/webhook', verifyWebhook);
 router.post('/webhook', updateMessageStatus);
 
 // All other routes require authentication

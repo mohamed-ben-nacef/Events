@@ -1,5 +1,7 @@
 import rateLimit from 'express-rate-limit';
 
+const skipInDev = () => process.env.NODE_ENV === 'development';
+
 // Rate limiter for login attempts
 export const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -8,6 +10,7 @@ export const loginLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true,
+  skip: skipInDev,
 });
 
 // Rate limiter for registration
@@ -17,6 +20,7 @@ export const registerLimiter = rateLimit({
   message: 'Too many registration attempts, please try again later',
   standardHeaders: true,
   legacyHeaders: false,
+  skip: skipInDev,
 });
 
 // Rate limiter for password reset
@@ -26,6 +30,7 @@ export const passwordResetLimiter = rateLimit({
   message: 'Too many password reset requests, please try again later',
   standardHeaders: true,
   legacyHeaders: false,
+  skip: skipInDev,
 });
 
 // General API rate limiter
@@ -35,4 +40,5 @@ export const apiLimiter = rateLimit({
   message: 'Too many requests, please try again later',
   standardHeaders: true,
   legacyHeaders: false,
+  skip: skipInDev,
 });

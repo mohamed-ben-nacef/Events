@@ -4,21 +4,21 @@ export const sendWhatsAppMessageValidator: ValidationChain[] = [
   body('recipient_phone')
     .trim()
     .isLength({ min: 10, max: 20 })
-    .withMessage('Recipient phone must be between 10 and 20 characters')
-    .matches(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/)
-    .withMessage('Please provide a valid phone number'),
+    .withMessage('Recipient phone must be between 10 and 20 characters'),
   body('recipient_name')
     .trim()
     .isLength({ min: 1, max: 255 })
     .withMessage('Recipient name must be between 1 and 255 characters'),
   body('message_content')
-    .trim()
-    .isLength({ min: 1 })
-    .withMessage('Message content is required'),
+    .optional()
+    .trim(),
+  body('template_name')
+    .optional()
+    .trim(),
   body('message_type')
     .optional()
-    .isIn(['INVITATION', 'RAPPEL', 'NOTIFICATION'])
-    .withMessage('Message type must be one of: INVITATION, RAPPEL, NOTIFICATION'),
+    .isIn(['DIRECT', 'INVITATION', 'RAPPEL', 'NOTIFICATION', 'TEMPLATE'])
+    .withMessage('Invalid message type'),
   body('event_id')
     .optional()
     .isUUID()

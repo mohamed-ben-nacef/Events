@@ -24,7 +24,7 @@ router.get('/', getAllSubcategories);
 router.get('/:id', validate(subcategoryIdValidator), getSubcategoryById);
 router.post(
   '/',
-  authorize('ADMIN', 'MAINTENANCE'),
+  authorize('ADMIN', 'MAINTENANCE', 'TECHNICIEN'),
   validate(createSubcategoryValidator),
   createSubcategory
 );
