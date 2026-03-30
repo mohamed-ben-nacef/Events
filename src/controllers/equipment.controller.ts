@@ -10,6 +10,7 @@ import {
 } from '../utils/errors';
 import { asyncHandler } from '../middleware/errorHandler';
 import { generateEquipmentReference } from '../utils/referenceGenerator';
+import { generateQRCode } from '../utils/qrCodeGenerator';
 import { Op } from 'sequelize';
 
 // Get all equipment with pagination and filtering
@@ -143,7 +144,6 @@ export const createEquipment = asyncHandler(
       warranty_end_date,
       supplier,
       weight_kg,
-      qr_code_url,
       photos,
       manual_url,
     } = req.body;
@@ -169,6 +169,9 @@ export const createEquipment = asyncHandler(
     // Generate unique reference
     const reference = await generateEquipmentReference(category_id);
 
+    // Generate QR code for the reference
+    const qr_code_url = await generateQRCode(reference);
+
     // Create equipment
     const equipment = await Equipment.create({
       name,
@@ -187,7 +190,7 @@ export const createEquipment = asyncHandler(
       warranty_end_date: warranty_end_date || undefined,
       supplier: supplier || undefined,
       weight_kg: weight_kg || undefined,
-      qr_code_url: qr_code_url || undefined,
+      qr_code_url,
       photos: photos || undefined,
       manual_url: manual_url || undefined,
     });
@@ -263,6 +266,11 @@ export const updateEquipment = asyncHandler(
       if (req.body[field] !== undefined) {
         updateData[field] = req.body[field];
       }
+    }
+
+    // If qr_code_url is missing, generate it
+    if (!equipment.qr_code_url && !updateData.qr_code_url) {
+      updateData.qr_code_url = await generateQRCode(equipment.reference);
     }
 
     // Verify category if being updated
