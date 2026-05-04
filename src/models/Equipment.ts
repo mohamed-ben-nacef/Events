@@ -15,6 +15,11 @@ interface EquipmentAttributes {
   technical_specs?: string;
   quantity_total: number;
   quantity_available: number;
+  quantity_broken: number;
+  is_lot_based: boolean;
+  items_per_lot: number;
+  quantity_in_maintenance: number;
+  quantity_in_rental: number;
   purchase_price?: number;
   daily_rental_price?: number;
   purchase_date?: Date;
@@ -28,7 +33,7 @@ interface EquipmentAttributes {
   updated_at?: Date;
 }
 
-interface EquipmentCreationAttributes extends Optional<EquipmentAttributes, 'id' | 'subcategory_id' | 'brand' | 'model' | 'description' | 'technical_specs' | 'quantity_total' | 'quantity_available' | 'purchase_price' | 'daily_rental_price' | 'purchase_date' | 'warranty_end_date' | 'supplier' | 'weight_kg' | 'qr_code_url' | 'photos' | 'manual_url' | 'created_at' | 'updated_at'> {}
+interface EquipmentCreationAttributes extends Optional<EquipmentAttributes, 'id' | 'subcategory_id' | 'brand' | 'model' | 'description' | 'technical_specs' | 'quantity_total' | 'quantity_available' | 'quantity_broken' | 'quantity_in_maintenance' | 'quantity_in_rental' | 'is_lot_based' | 'items_per_lot' | 'purchase_price' | 'daily_rental_price' | 'purchase_date' | 'warranty_end_date' | 'supplier' | 'weight_kg' | 'qr_code_url' | 'photos' | 'manual_url' | 'created_at' | 'updated_at'> {}
 
 class Equipment extends Model<EquipmentAttributes, EquipmentCreationAttributes> implements EquipmentAttributes {
   public id!: string;
@@ -42,6 +47,11 @@ class Equipment extends Model<EquipmentAttributes, EquipmentCreationAttributes> 
   public technical_specs!: string;
   public quantity_total!: number;
   public quantity_available!: number;
+  public quantity_broken!: number;
+  public quantity_in_maintenance!: number;
+  public quantity_in_rental!: number;
+  public is_lot_based!: boolean;
+  public items_per_lot!: number;
   public purchase_price!: number;
   public daily_rental_price!: number;
   public purchase_date!: Date;
@@ -114,6 +124,31 @@ Equipment.init(
       allowNull: false,
       defaultValue: 0,
     },
+    quantity_broken: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    quantity_in_maintenance: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    quantity_in_rental: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    is_lot_based: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+    items_per_lot: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
+    },
     purchase_price: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: true,
@@ -139,7 +174,7 @@ Equipment.init(
       allowNull: true,
     },
     qr_code_url: {
-      type: DataTypes.STRING(500),
+      type: DataTypes.TEXT,
       allowNull: true,
     },
     photos: {
@@ -147,7 +182,7 @@ Equipment.init(
       allowNull: true,
     },
     manual_url: {
-      type: DataTypes.STRING(500),
+      type: DataTypes.TEXT,
       allowNull: true,
     },
   },

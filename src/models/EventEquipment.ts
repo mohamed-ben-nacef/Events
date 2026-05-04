@@ -7,22 +7,26 @@ interface EventEquipmentAttributes {
   id: string;
   event_id: string;
   equipment_id: string;
-  quantity_reserved: number;
-  quantity_returned: number;
+  quantity_reserved: number; // total pieces
+  lots_reserved: number;     // number of lots
+  quantity_returned: number; // pieces returned
+  items_broken: number;      // pieces broken/missing
   status: 'RESERVE' | 'LIVRE' | 'RETOURNE';
   notes?: string;
   created_at?: Date;
   updated_at?: Date;
 }
 
-interface EventEquipmentCreationAttributes extends Optional<EventEquipmentAttributes, 'id' | 'quantity_returned' | 'status' | 'notes' | 'created_at' | 'updated_at'> {}
+interface EventEquipmentCreationAttributes extends Optional<EventEquipmentAttributes, 'id' | 'lots_reserved' | 'quantity_returned' | 'items_broken' | 'status' | 'notes' | 'created_at' | 'updated_at'> {}
 
 class EventEquipment extends Model<EventEquipmentAttributes, EventEquipmentCreationAttributes> implements EventEquipmentAttributes {
   public id!: string;
   public event_id!: string;
   public equipment_id!: string;
   public quantity_reserved!: number;
+  public lots_reserved!: number;
   public quantity_returned!: number;
+  public items_broken!: number;
   public status!: 'RESERVE' | 'LIVRE' | 'RETOURNE';
   public notes!: string;
   
@@ -58,7 +62,17 @@ EventEquipment.init(
       type: DataTypes.INTEGER,
       allowNull: false,
     },
+    lots_reserved: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
     quantity_returned: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    items_broken: {
       type: DataTypes.INTEGER,
       allowNull: false,
       defaultValue: 0,

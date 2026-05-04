@@ -32,6 +32,22 @@ export const createEquipmentValidator: ValidationChain[] = [
     .optional()
     .isInt({ min: 0 })
     .withMessage('Total quantity must be a non-negative integer'),
+  body('quantity_broken')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Broken quantity must be a non-negative integer'),
+  body('is_lot_based')
+    .optional()
+    .isBoolean()
+    .withMessage('is_lot_based must be a boolean'),
+  body('items_per_lot')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Items per lot must be at least 1'),
+  body('quantity_lots')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Quantity of lots must be a non-negative integer'),
   body('purchase_price')
     .optional()
     .isFloat({ min: 0 })
@@ -120,6 +136,22 @@ export const updateEquipmentValidator: ValidationChain[] = [
     .optional()
     .isInt({ min: 0 })
     .withMessage('Total quantity must be a non-negative integer'),
+  body('quantity_broken')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Broken quantity must be a non-negative integer'),
+  body('is_lot_based')
+    .optional()
+    .isBoolean()
+    .withMessage('is_lot_based must be a boolean'),
+  body('items_per_lot')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Items per lot must be at least 1'),
+  body('quantity_lots')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Quantity of lots must be a non-negative integer'),
   body('purchase_price')
     .optional()
     .isFloat({ min: 0 })

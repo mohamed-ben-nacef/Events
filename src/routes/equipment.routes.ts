@@ -59,6 +59,11 @@ router.get(
   validate(equipmentIdValidator),
   getEquipmentStatusHistory
 );
+router.get(
+  '/:id/history',
+  validate(equipmentIdValidator),
+  getEquipmentStatusHistory
+);
 router.post(
   '/:id/status',
   validate(updateEquipmentStatusValidator),

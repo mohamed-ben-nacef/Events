@@ -250,16 +250,6 @@ export const refreshToken = asyncHandler(
     };
 
     const newAccessToken = generateAccessToken(tokenPayload);
-    const newRefreshToken = generateRefreshToken(tokenPayload);
-
-    // Update refresh token in database
-    const refreshTokenExpires = new Date();
-    refreshTokenExpires.setDate(refreshTokenExpires.getDate() + 7);
-
-    await user.update({
-      refresh_token: newRefreshToken,
-      refresh_token_expires: refreshTokenExpires,
-    });
 
     res.json({
       success: true,
@@ -267,7 +257,7 @@ export const refreshToken = asyncHandler(
       data: {
         tokens: {
           access_token: newAccessToken,
-          refresh_token: newRefreshToken,
+          refresh_token: user.refresh_token, // Return the same refresh token
         },
       },
     });

@@ -326,7 +326,7 @@ export const reserveEquipment = asyncHandler(
     }
 
     const eventId = req.params.eventId as string;
-    const { equipment_id, quantity_reserved, notes } = req.body;
+    const { equipment_id, quantity_reserved, lots_reserved, notes } = req.body;
 
     // Verify event exists
     const event = await Event.findByPk(eventId);
@@ -338,6 +338,18 @@ export const reserveEquipment = asyncHandler(
     const equipment = await Equipment.findByPk(equipment_id);
     if (!equipment) {
       throw new NotFoundError('Equipment not found');
+    }
+
+    let finalQuantityReserved = quantity_reserved;
+    let finalLotsReserved = lots_reserved || 0;
+
+    if (equipment.is_lot_based && lots_reserved !== undefined) {
+      finalQuantityReserved = lots_reserved * equipment.items_per_lot;
+      finalLotsReserved = lots_reserved;
+    } else if (equipment.is_lot_based && quantity_reserved !== undefined) {
+      // If they gave pieces but it's lot based, try to infer lots
+      finalLotsReserved = Math.ceil(quantity_reserved / equipment.items_per_lot);
+      finalQuantityReserved = quantity_reserved;
     }
 
     // Check if equipment is in maintenance
@@ -356,9 +368,9 @@ export const reserveEquipment = asyncHandler(
     }
 
     // Check available quantity
-    if (quantity_reserved > equipment.quantity_available) {
+    if (finalQuantityReserved > equipment.quantity_available) {
       throw new ValidationError(
-        `Insufficient quantity available. Requested: ${quantity_reserved}, Available: ${equipment.quantity_available}`
+        `Insufficient quantity available. Requested: ${finalQuantityReserved}, Available: ${equipment.quantity_available}`
       );
     }
 
@@ -378,14 +390,16 @@ export const reserveEquipment = asyncHandler(
     const reservation = await EventEquipment.create({
       event_id: eventId,
       equipment_id,
-      quantity_reserved,
+      quantity_reserved: finalQuantityReserved,
+      lots_reserved: finalLotsReserved,
       quantity_returned: 0,
+       items_broken: 0,
       status: 'RESERVE',
       notes: notes || undefined,
     });
 
     // Update equipment status
-    const newAvailable = equipment.quantity_available - quantity_reserved;
+    const newAvailable = equipment.quantity_available - finalQuantityReserved;
     await equipment.update({
       quantity_available: newAvailable,
     });
@@ -394,10 +408,10 @@ export const reserveEquipment = asyncHandler(
     await EquipmentStatus.create({
       equipment_id,
       status: 'EN_LOCATION',
-      quantity: quantity_reserved,
+      quantity: finalQuantityReserved,
       related_event_id: eventId,
       changed_by: req.user.id,
-      notes: `Reserved for event: ${event.event_name}`,
+      notes: `Reserved for event: ${event.event_name}${equipment.is_lot_based ? ` (${finalLotsReserved} lots)` : ''}`,
     });
 
     // Fetch reservation with equipment
@@ -586,7 +600,7 @@ export const returnEquipment = asyncHandler(
 
     const eventId = req.params.eventId as string;
     const reservationId = req.params.reservationId as string;
-    const { quantity_returned, notes } = req.body;
+    const { quantity_returned, items_broken = 0, notes } = req.body;
 
     const reservation = await EventEquipment.findOne({
       where: {
@@ -607,41 +621,69 @@ export const returnEquipment = asyncHandler(
 
     const equipment = (reservation as any).equipment;
     const newReturned = reservation.quantity_returned + quantity_returned;
+    const newBroken = reservation.items_broken + items_broken;
 
-    if (newReturned > reservation.quantity_reserved) {
+    if (newReturned + newBroken > reservation.quantity_reserved) {
       throw new ValidationError(
-        `Cannot return ${quantity_returned} items. Only ${reservation.quantity_reserved - reservation.quantity_returned} items can be returned.`
+        `Invalid return quantities. Total returned (${newReturned}) + broken (${newBroken}) cannot exceed reserved quantity (${reservation.quantity_reserved}).`
       );
     }
 
     // Update reservation
     const updateData: any = {
       quantity_returned: newReturned,
+      items_broken: newBroken,
       notes: notes || reservation.notes,
     };
 
-    if (newReturned === reservation.quantity_reserved) {
+    // If all accounted for (returned + broken), update status
+    if (newReturned + newBroken === reservation.quantity_reserved) {
       updateData.status = 'RETOURNE';
     }
 
     await reservation.update(updateData);
 
-    // Update equipment available quantity
+    // Update equipment quantities
+    if (items_broken > 0) {
+      // Increment total broken count
+      equipment.quantity_broken += items_broken;
+      // Decrement total pieces available globally (usable stock)
+      equipment.quantity_total = Math.max(0, equipment.quantity_total - items_broken);
+      await equipment.save();
+    }
+
+    // Available items increase by returned amount
     const newAvailable = Math.min(
       equipment.quantity_total,
       equipment.quantity_available + quantity_returned
     );
-    await equipment.update({ quantity_available: newAvailable });
+    
+    await equipment.update({ 
+      quantity_total: equipment.quantity_total,
+      quantity_available: newAvailable 
+    });
 
     // Create equipment status entry
     await EquipmentStatus.create({
       equipment_id: equipment.id,
-      status: newReturned === reservation.quantity_reserved ? 'DISPONIBLE' : 'EN_LOCATION',
+      status: updateData.status === 'RETOURNE' ? 'DISPONIBLE' : 'EN_LOCATION',
       quantity: quantity_returned,
       related_event_id: eventId,
       changed_by: req.user.id,
-      notes: `Returned ${quantity_returned} items from event`,
+      notes: `Returned ${quantity_returned} items, ${items_broken} broken.`,
     });
+
+    // If there are broken items, log it specially
+    if (items_broken > 0) {
+      await EquipmentStatus.create({
+        equipment_id: equipment.id,
+        status: 'MANQUANT',
+        quantity: items_broken,
+        related_event_id: eventId,
+        changed_by: req.user.id,
+        notes: `Items marked as broken/lost during return from event: ${eventId}`,
+      });
+    }
 
     // Fetch updated reservation
     const updatedReservation = await EventEquipment.findByPk(reservationId, {

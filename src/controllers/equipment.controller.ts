@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import Equipment from '../models/Equipment';
 import EquipmentStatus from '../models/EquipmentStatus';
 import Category from '../models/Category';
@@ -138,6 +139,9 @@ export const createEquipment = asyncHandler(
       description,
       technical_specs,
       quantity_total = 0,
+      is_lot_based = false,
+      items_per_lot = 1,
+      quantity_lots = 0,
       purchase_price,
       daily_rental_price,
       purchase_date,
@@ -147,6 +151,12 @@ export const createEquipment = asyncHandler(
       photos,
       manual_url,
     } = req.body;
+
+    // Calculate final quantity total
+    let finalQuantityTotal = quantity_total;
+    if (is_lot_based) {
+      finalQuantityTotal = quantity_lots * items_per_lot;
+    }
 
     // Verify category exists
     const category = await Category.findByPk(category_id);
@@ -169,11 +179,16 @@ export const createEquipment = asyncHandler(
     // Generate unique reference
     const reference = await generateEquipmentReference(category_id);
 
-    // Generate QR code for the reference
-    const qr_code_url = await generateQRCode(reference);
+    // Pre-generate ID to use in QR code
+    const id = crypto.randomUUID();
+
+    // Generate QR code pointing to the frontend public page
+    const publicUrl = `${process.env.APP_URL || 'http://localhost:3000'}/QTE/${id}`;
+    const qr_code_url = await generateQRCode(publicUrl);
 
     // Create equipment
     const equipment = await Equipment.create({
+      id,
       name,
       reference,
       category_id,
@@ -182,8 +197,11 @@ export const createEquipment = asyncHandler(
       model: model || undefined,
       description: description || undefined,
       technical_specs: technical_specs || undefined,
-      quantity_total,
-      quantity_available: quantity_total, // Initially all available
+      quantity_total: finalQuantityTotal,
+      quantity_available: finalQuantityTotal, // Initially all available
+      quantity_broken: 0, // Initially no broken items
+      is_lot_based,
+      items_per_lot,
       purchase_price: purchase_price || undefined,
       daily_rental_price: daily_rental_price || undefined,
       purchase_date: purchase_date || undefined,
@@ -199,8 +217,8 @@ export const createEquipment = asyncHandler(
     if (req.user) {
       await EquipmentStatus.create({
         equipment_id: equipment.id,
-        status: quantity_total > 0 ? 'DISPONIBLE' : 'MANQUANT',
-        quantity: quantity_total,
+        status: finalQuantityTotal > 0 ? 'DISPONIBLE' : 'MANQUANT',
+        quantity: finalQuantityTotal,
         changed_by: req.user.id,
         notes: 'Initial equipment creation',
       });
@@ -251,6 +269,10 @@ export const updateEquipment = asyncHandler(
       'description',
       'technical_specs',
       'quantity_total',
+      'quantity_broken',
+      'is_lot_based',
+      'items_per_lot',
+      'quantity_lots',
       'purchase_price',
       'daily_rental_price',
       'purchase_date',
@@ -294,12 +316,39 @@ export const updateEquipment = asyncHandler(
       }
     }
 
-    // If quantity_total is being updated, recalculate quantity_available
-    if (updateData.quantity_total !== undefined) {
+    // If quantity_total, quantity_lots, items_per_lot or is_lot_based is being updated, recalculate total
+    const isLotsUpdate = 
+      updateData.quantity_lots !== undefined || 
+      updateData.quantity_total !== undefined ||
+      updateData.items_per_lot !== undefined ||
+      updateData.is_lot_based !== undefined;
+
+    if (isLotsUpdate) {
+      const isLot = updateData.is_lot_based !== undefined ? updateData.is_lot_based : equipment.is_lot_based;
+      const itemsPerLot = updateData.items_per_lot !== undefined ? updateData.items_per_lot : equipment.items_per_lot;
+      
+      let newTotal = equipment.quantity_total;
+      
+      if (isLot) {
+        // If it's a lot-based item, we prefer quantity_lots * itemsPerLot
+        // We use the new quantity_lots if provided, otherwise we reverse-calculate from current total
+        const currentLots = Math.floor(equipment.quantity_total / (equipment.items_per_lot || 1));
+        const finalLots = updateData.quantity_lots !== undefined ? updateData.quantity_lots : currentLots;
+        
+        newTotal = finalLots * itemsPerLot;
+        updateData.quantity_total = newTotal;
+      } else if (updateData.quantity_total !== undefined) {
+        newTotal = updateData.quantity_total;
+      }
+
+      // Sync available quantity (Total - Rented)
       const currentRented = equipment.quantity_total - equipment.quantity_available;
-      const newAvailable = Math.max(0, updateData.quantity_total - currentRented);
+      const newAvailable = Math.max(0, newTotal - currentRented);
       updateData.quantity_available = newAvailable;
     }
+
+    // Remove virtual field before update
+    delete updateData.quantity_lots;
 
     await equipment.update(updateData);
 
@@ -433,22 +482,42 @@ export const updateEquipmentStatus = asyncHandler(
       changed_by: req.user.id,
     });
 
-    // Update equipment quantity_available based on status
+    // Update equipment counts based on status
     let newAvailable = equipment.quantity_available;
+    let newMaintenance = equipment.quantity_in_maintenance;
+    let newRental = equipment.quantity_in_rental;
+    let newBroken = equipment.quantity_broken;
 
-    if (status === 'EN_LOCATION' || status === 'EN_MAINTENANCE') {
+    if (status === 'EN_LOCATION') {
       newAvailable = Math.max(0, equipment.quantity_available - quantity);
+      newRental += quantity;
+    } else if (status === 'EN_MAINTENANCE') {
+      newAvailable = Math.max(0, equipment.quantity_available - quantity);
+      newMaintenance += quantity;
     } else if (status === 'DISPONIBLE') {
-      // Returning equipment
-      newAvailable = Math.min(
-        equipment.quantity_total,
-        equipment.quantity_available + quantity
-      );
+      // Returning to service
+      // We prioritize returning from maintenance then rental
+      if (equipment.quantity_in_maintenance > 0) {
+        const fromMaintenance = Math.min(quantity, equipment.quantity_in_maintenance);
+        newMaintenance -= fromMaintenance;
+        const remainder = quantity - fromMaintenance;
+        if (remainder > 0) {
+          newRental = Math.max(0, newRental - remainder);
+        }
+      } else {
+        newRental = Math.max(0, newRental - quantity);
+      }
+      newAvailable = Math.min(equipment.quantity_total, equipment.quantity_available + quantity);
+    } else if (status === 'MANQUANT') {
+      newAvailable = Math.max(0, equipment.quantity_available - quantity);
+      newBroken += quantity;
     }
-    // MANQUANT doesn't change available quantity
 
     await equipment.update({
       quantity_available: newAvailable,
+      quantity_in_maintenance: newMaintenance,
+      quantity_in_rental: newRental,
+      quantity_broken: newBroken,
     });
 
     // Fetch updated equipment
