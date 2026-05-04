@@ -73,7 +73,7 @@ app.use((req, _res, next) => {
 // ─── Rate Limiting ────────────────────────────────────────────────────────────
 // If the app sits behind a proxy (Render, Heroku, Nginx, etc.) uncomment the
 // line below so express-rate-limit reads the real client IP from X-Forwarded-For.
-// app.set('trust proxy', 1);
+app.set('trust proxy', 1);
 app.use('/api', apiLimiter);
 
 // ─── Static Files ─────────────────────────────────────────────────────────────
